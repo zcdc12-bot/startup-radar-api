@@ -1,1 +1,309 @@
 
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>StartupRadar Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#090910;font-family:'Heebo',sans-serif;color:#e0e0f0}
+::-webkit-scrollbar{display:none}
+.tap{transition:all .15s;cursor:pointer}
+.tap:active{opacity:.7;transform:scale(.97)}
+input,textarea{outline:none}
+input::placeholder,textarea::placeholder{color:#334}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes sIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const PROXY = "https://startup-radar-api.vercel.app";
+const FK    = "d8j5sqpr01qgth6in83gd8j5sqpr01qgth6in840";
+const C = {
+  bg:"#090910",card:"#0f0f1a",border:"#1c1c2e",accent:"#7c6aff",
+  green:"#00f5c4",red:"#ff5c7a",yellow:"#ffd166",orange:"#ff9f43",
+  text:"#e0e0f0",muted:"#556",font:"'Heebo',sans-serif"
+};
+
+// ── Cache ──
+const CACHE={};
+const setC=(k,v,age=1800000)=>{CACHE[k]={v,ts:Date.now(),age};return v;};
+const getC=(k)=>{const c=CACHE[k];return c&&Date.now()-c.ts<(c.age||1800000)?c.v:null;};
+
+const fV=n=>{if(!n)return"—";if(n>=1e12)return(n/1e12).toFixed(1)+"T";if(n>=1e9)return(n/1e9).toFixed(1)+"B";if(n>=1e6)return(n/1e6).toFixed(1)+"M";if(n>=1e3)return(n/1e3).toFixed(0)+"K";return""+n;};
+const RC=r=>r==="Strong Buy"?C.green:r==="Buy"?"#7fe0b0":r==="Hold"?C.yellow:C.red;
+const fmtD=t=>{const d=new Date(t*1000);return`${d.getDate()}/${d.getMonth()+1}`;};
+
+const META={
+  NVDA:{n:"NVIDIA",s:"Semiconductors"},AAPL:{n:"Apple",s:"Consumer Tech"},
+  MSFT:{n:"Microsoft",s:"Cloud/AI"},TSLA:{n:"Tesla",s:"EV"},
+  META:{n:"Meta",s:"Social/AI"},AMZN:{n:"Amazon",s:"Cloud"},
+  GOOGL:{n:"Alphabet",s:"Search/AI"},AMD:{n:"AMD",s:"Semiconductors"},
+  CRWD:{n:"CrowdStrike",s:"Cybersecurity"},COIN:{n:"Coinbase",s:"Crypto"},
+  MNDY:{n:"Monday.com",s:"SaaS IL"},CHKP:{n:"Check Point",s:"Cyber IL"},
+  CYBR:{n:"CyberArk",s:"Cyber IL"},TEVA:{n:"Teva",s:"Pharma IL"},
+  PANW:{n:"Palo Alto",s:"Cybersecurity"},SPY:{n:"S&P 500 ETF",s:"ETF"},
+  QQQ:{n:"Nasdaq ETF",s:"ETF"},NVDA:{n:"NVIDIA",s:"Semiconductors"},
+  PLTR:{n:"Palantir",s:"AI/Data"},SOFI:{n:"SoFi",s:"Fintech"},
+  MSTR:{n:"MicroStrategy",s:"Bitcoin"},NET:{n:"Cloudflare",s:"Cloud Sec"},
+  UBER:{n:"Uber",s:"Mobility"},NFLX:{n:"Netflix",s:"Streaming"},
+  GLD:{n:"Gold ETF",s:"ETF"},V:{n:"Visa",s:"Payments"},
+  JPM:{n:"JPMorgan",s:"Banking"},LLY:{n:"Eli Lilly",s:"Pharma"},
+  ARM:{n:"Arm Holdings",s:"Chip Arch"},SHOP:{n:"Shopify",s:"eCommerce"},
+};
+
+const GROUPS={
+  "⚡ Mag7":["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA"],
+  "💾 שבבים":["NVDA","AMD","AVGO","TSM","MU","INTC","ARM"],
+  "🔐 סייבר":["CRWD","PANW","CHKP","CYBR","NET"],
+  "🏦 פיננסים":["JPM","V","GS","BAC","MA"],
+  "🌐 ישראל":["MNDY","CHKP","CYBR","TEVA","NICE","WIX","GLBE"],
+  "📦 ETFs":["SPY","QQQ","GLD"],
+  "🔥 ספקול":["COIN","MSTR","PLTR","SOFI"],
+};
+const TRS=[{l:"1D",r:"1d"},{l:"1W",r:"5d"},{l:"1M",r:"1mo"},{l:"3M",r:"3mo"},{l:"6M",r:"6mo"},{l:"1Y",r:"1y"}];
+const MAS=[{l:"ללא",d:0},{l:"MA9",d:9},{l:"MA20",d:20},{l:"MA50",d:50},{l:"MA200",d:200}];
+
+async function ai(prompt,maxT=800){
+  try{
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:maxT,
+        messages:[{role:"user",content:prompt}]})});
+    const d=await r.json();
+    return d.content?.map(c=>c.text||"").join("")||"";
+  }catch{return"";}
+}
+async function parseJSON(txt){
+  try{return JSON.parse(txt.replace(/```json|```/g,"").trim());}catch{return null;}
+}
+
+async function loadStock(sym,range="6mo"){
+  const key=`s_${sym}_${range}`;
+  const hit=getC(key);if(hit)return hit;
+  const r=await fetch(`${PROXY}/api/stock?sym=${sym}&range=${range}`);
+  if(!r.ok) throw new Error(`HTTP ${r.status}`);
+  const d=await r.json();
+  if(!d?.price) throw new Error("No price");
+  const result={
+    symbol:sym,name:META[sym]?.n||sym,sector:META[sym]?.s||"",
+    price:d.price,chgPct:d.chgPct,volume:d.volume,mktCap:d.mktCap,
+    week52High:d.week52High,week52Low:d.week52Low,
+    candles:d.candles||[],source:"yahoo"
+  };
+  setC(key,result);
+  enrichMeta(sym,result.price);
+  return result;
+}
+
+async function enrichMeta(sym,price){
+  const key=`meta_${sym}`;
+  if(getC(key))return;
+  const txt=await ai(`Stock ${sym} ~$${price}. JSON only no markdown:
+{"pe":X,"rating":"Strong Buy|Buy|Hold|Sell","target":X,"description":"2 sentences Hebrew"}`,300);
+  const d=await parseJSON(txt);
+  if(d) setC(key,d,86400000);
+}
+
+function detectAnomalies(candles){
+  if(!candles||candles.length<15)return[];
+  const vols=candles.map(c=>c.v||0);
+  const avg=vols.reduce((a,b)=>a+b,0)/vols.length;
+  const std=Math.sqrt(vols.reduce((s,v)=>s+(v-avg)**2,0)/vols.length)||1;
+  const ev=[];let last=-10;
+  for(let i=5;i<candles.length-3;i++){
+    if(i-last<10)continue;
+    const v=candles[i].v||0,z=(v-avg)/std;
+    if(z>1.5){
+      const prev=candles[Math.max(0,i-2)].c||candles[i].c;
+      const chg=(candles[i].c-prev)/prev*100;
+      const fwd=(candles[Math.min(i+8,candles.length-1)].c-candles[i].c)/candles[i].c*100;
+      ev.push({idx:i,type:chg>=0?"buy":"sell",price:candles[i].c,
+        vol:v,z:z.toFixed(1),fwdChg:+(fwd.toFixed(1)),
+        shares:fV(v),value:(v*candles[i].c/1e9).toFixed(2),
+        reason:chg>=0?"נפח חריג + עלייה":"נפח חריג + ירידה"});
+      last=i;
+    }
+  }
+  return ev.slice(0,8);
+}
+
+function calcCorr(candles){
+  if(!candles||candles.length<10)return null;
+  const P=candles.map(c=>c.c).filter(Boolean);
+  const V=candles.map(c=>c.v).filter(Boolean);
+  const n=Math.min(P.length,V.length);
+  const pm=P.slice(0,n).reduce((a,b)=>a+b,0)/n;
+  const vm=V.slice(0,n).reduce((a,b)=>a+b,0)/n;
+  let cov=0,sp=0,sv=0;
+  for(let i=0;i<n;i++){cov+=(P[i]-pm)*(V[i]-vm);sp+=(P[i]-pm)**2;sv+=(V[i]-vm)**2;}
+  const pvCorr=sp&&sv?cov/Math.sqrt(sp*sv):0;
+  const avgV=V.reduce((a,b)=>a+b,0)/n;
+  let upV=0,upC=0,dnV=0,dnC=0,spUp=0,spT=0;
+  for(let i=1;i<n;i++){
+    if(P[i]>P[i-1]){upV+=V[i];upC++;}else{dnV+=V[i];dnC++;}
+    if(V[i]>avgV*1.8){spT++;if(i+2<n&&P[i+2]>P[i])spUp++;}
+  }
+  const volRatio=dnC?(upV/Math.max(upC,1))/(dnV/Math.max(dnC,1)):1;
+  const spikePct=spT?(spUp/spT*100).toFixed(0):"—";
+  const R=P.slice(1).map((p,i)=>(p-P[i])/P[i]*100);
+  const posR=R.filter(r=>r>0),negR=R.filter(r=>r<0);
+  return{pvCorr:pvCorr.toFixed(2),volRatio:volRatio.toFixed(2),
+    spikePct,spT,spUp,
+    avgPos:posR.length?(posR.reduce((a,b)=>a+b,0)/posR.length).toFixed(2):"0",
+    avgNeg:negR.length?(negR.reduce((a,b)=>a+b,0)/negR.length).toFixed(2):"0",n};
+}
+
+function Spark({prices,pos,w=70,h=24}){
+  if(!prices||prices.length<2)return React.createElement("div",{style:{width:w,height:h}});
+  const mn=Math.min(...prices),mx=Math.max(...prices);
+  const px=i=>(i/(prices.length-1))*w,py=v=>h-((v-mn)/(mx-mn||1))*(h-3)-1;
+  const pts=prices.map((v,i)=>`${px(i)},${py(v)}`).join(" ");
+  const id=`sp${w}${pos?1:0}`;
+  return(
+    <svg width={w} height={h}>
+      <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={pos?C.green:C.red} stopOpacity="0.3"/>
+        <stop offset="100%" stopColor={pos?C.green:C.red} stopOpacity="0"/>
+      </linearGradient></defs>
+      <path d={`M${pts.split(" ").join(" L")} L${px(prices.length-1)},${h} L0,${h} Z`} fill={`url(#${id})`}/>
+      <polyline points={pts} fill="none" stroke={pos?C.green:C.red} strokeWidth="1.6" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+function Chart({candles,anomalies,sym,fullscreen=false,onClose}){
+  const [ma,setMa]=useState(MAS[0]);
+  const [ch,setCh]=useState(null);
+  const [wW,setWW]=useState(window.innerWidth);
+  const [wH,setWH]=useState(window.innerHeight);
+  const vRef=useRef({ox:0,sc:1});
+  const dRef=useRef({on:false,sx:0,so:0,mv:false});
+  const pRef=useRef({on:false,sd:0,ssc:1,so:0,mx:0});
+  const [,bump]=useState(0);const rd=()=>bump(n=>n+1);
+
+  useEffect(()=>{
+    if(!fullscreen)return;
+    const u=()=>{setWW(window.innerWidth);setWH(window.innerHeight);};
+    window.addEventListener("resize",u);return()=>window.removeEventListener("resize",u);
+  },[fullscreen]);
+
+  if(!candles||candles.length<2)return <div style={{padding:24,textAlign:"center",color:C.muted}}>📊 אין נתוני גרף</div>;
+
+  const W=fullscreen?wW:window.innerWidth-24,PH=fullscreen?Math.round(wH*.58):120;
+  const VH=fullscreen?Math.round(wH*.11):32,YW=fullscreen?62:50,CW=W-YW;
+  const VOFF=PH+18,TH=VOFF+VH+22;
+  const clamp=(ox,sc)=>{sc=Math.max(1,Math.min(12,sc));return{ox:Math.max(-(CW-CW/sc),Math.min(0,ox)),sc};};
+  const getR=()=>{const{ox,sc}=vRef.current,n=candles.length,sf=Math.abs(ox)/CW;return{si:Math.max(0,Math.floor(sf*n)),ei:Math.min(n-1,Math.ceil((sf+1/sc)*n))};};
+  const p2y=(v,mn,mx)=>12+(1-(v-mn)/(mx-mn||1))*(PH-20);
+  const i2x=(i,si,ei)=>YW+((i-si)/Math.max(ei-si,1))*CW;
+
+  const onTS=e=>{if(e.touches.length===1){dRef.current={on:true,sx:e.touches[0].clientX,so:vRef.current.ox,mv:false};pRef.current.on=false;}else if(e.touches.length===2){dRef.current.on=false;const dx=e.touches[1].clientX-e.touches[0].clientX,dy=e.touches[1].clientY-e.touches[0].clientY;pRef.current={on:true,sd:Math.sqrt(dx*dx+dy*dy),ssc:vRef.current.sc,so:vRef.current.ox,mx:(e.touches[0].clientX+e.touches[1].clientX)/2-YW};}};
+  const onTM=e=>{e.preventDefault();if(e.touches.length===1&&dRef.current.on){const dx=e.touches[0].clientX-dRef.current.sx;dRef.current.mv=Math.abs(dx)>4;vRef.current=clamp(dRef.current.so+dx/vRef.current.sc,vRef.current.sc);setCh(null);rd();}else if(e.touches.length===2&&pRef.current.on){const dx=e.touches[1].clientX-e.touches[0].clientX,dy=e.touches[1].clientY-e.touches[0].clientY,dist=Math.sqrt(dx*dx+dy*dy),nsc=pRef.current.ssc*(dist/pRef.current.sd),mf=pRef.current.mx/CW;vRef.current=clamp(pRef.current.so-mf*CW*(1/nsc-1/pRef.current.ssc),nsc);rd();}};
+  const onTE=()=>{dRef.current.on=false;pRef.current.on=false;};
+  const onMD=e=>{dRef.current={on:true,sx:e.clientX,so:vRef.current.ox,mv:false};setCh(null);};
+  const onMU=()=>{dRef.current.on=false;};
+  const onML=()=>{dRef.current.on=false;setCh(null);};
+  const onWh=e=>{e.preventDefault();const f=e.deltaY<0?1.13:0.88,mf=(e.clientX-YW)/CW,o=vRef.current.sc,n2=o*f;vRef.current=clamp(vRef.current.ox-mf*CW*(1/n2-1/o),n2);rd();};
+  const onMM=e=>{
+    const rect=e.currentTarget.getBoundingClientRect(),cx=e.clientX-rect.left,cy=e.clientY-rect.top;
+    if(dRef.current.on){const dx=e.clientX-dRef.current.sx;dRef.current.mv=Math.abs(dx)>4;vRef.current=clamp(dRef.current.so+dx/vRef.current.sc,vRef.current.sc);setCh(null);rd();return;}
+    if(cx<YW||cy>VOFF+VH){setCh(null);return;}
+    const{si,ei}=getR(),idx=Math.max(si,Math.min(ei,Math.round(si+(cx-YW)/CW*(ei-si))));
+    const c=candles[idx],sl=candles.slice(si,ei+1);
+    const mn=Math.min(...sl.map(x=>x.l||x.c))*0.998,mx=Math.max(...sl.map(x=>x.h||x.c))*1.002;
+    const an=(anomalies||[]).find(a=>Math.abs(a.idx-idx)<=2)||null;
+    setCh({idx,c,ix:i2x(idx,si,ei),iy:p2y(c.c,mn,mx),d:fmtD(c.t),an});
+  };
+
+  const{si,ei}=getR();
+  const vis=candles.slice(si,ei+1);
+  const mn=Math.min(...vis.map(c=>c.l||c.c))*0.998,mx=Math.max(...vis.map(c=>c.h||c.c))*1.002;
+  const vmx=Math.max(...vis.map(c=>c.v))||1,avgV=candles.map(c=>c.v||0).reduce((a,b)=>a+b,0)/candles.length;
+  const pos=vis[vis.length-1]?.c>=vis[0]?.c;
+  const bW=Math.max(1,CW/(ei-si+1)-.8);
+  const ppts=vis.map((c,i)=>`${i2x(si+i,si,ei)},${p2y(c.c,mn,mx)}`);
+  const pLine="M"+ppts.join(" L");
+  const pArea=pLine+` L${i2x(ei,si,ei)},${PH} L${YW},${PH} Z`;
+  let maPath="";
+  if(ma.d>0){const ml=candles.map((_,i)=>i<ma.d-1?null:candles.slice(i-ma.d+1,i+1).reduce((s,c)=>s+(c.c||0),0)/ma.d);const mp=[];for(let i=si;i<=ei;i++){if(ml[i]!=null)mp.push(`${i2x(i,si,ei)},${p2y(ml[i],mn,mx)}`);}if(mp.length>1)maPath="M"+mp.join(" L");}
+  const lastMA=ma.d>0?(()=>{const ml=candles.map((_,i)=>i<ma.d-1?null:candles.slice(i-ma.d+1,i+1).reduce((s,c)=>s+(c.c||0),0)/ma.d);return[...ml.slice(0,ei+1)].filter(Boolean).pop();})():null;
+  const yLbls=Array.from({length:5},(_,i)=>{const v=mn+(mx-mn)*i/4;return{v,y:p2y(v,mn,mx)};}).reverse();
+  const numX=Math.min(6,ei-si);
+  const xLbls=Array.from({length:numX+1},(_,i)=>{const idx2=si+Math.round(i*(ei-si)/numX);return{idx2,l:fmtD(candles[idx2]?.t||0),x:i2x(idx2,si,ei)};});
+  const curY=p2y(candles[ei]?.c||0,mn,mx);
+  const fs=fullscreen;
+  const uid=`${sym}${fs?1:0}`;
+
+  const svgEl=(
+    <svg width={W} height={TH} style={{display:"block",userSelect:"none"}}>
+      <defs>
+        <linearGradient id={`cg${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={pos?C.green:C.red} stopOpacity="0.2"/>
+          <stop offset="100%" stopColor={pos?C.green:C.red} stopOpacity="0"/>
+        </linearGradient>
+        <clipPath id={`cc${uid}`}><rect x={YW} y={0} width={CW} height={TH}/></clipPath>
+      </defs>
+      <rect x={0} y={0} width={YW-1} height={TH} fill="#05050c"/>
+      <line x1={YW} y1={0} x2={YW} y2={TH} stroke={C.border} strokeWidth="1"/>
+      {yLbls.map((l,i)=>(
+        <g key={i}>
+          <line x1={YW} y1={l.y} x2={W} y2={l.y} stroke="#0e0e22" strokeWidth="1"/>
+          <text x={YW-4} y={l.y+4} textAnchor="end" fontSize={fs?"9.5":"8"} fill="#3a4060" fontFamily={C.font}>${l.v>=1000?l.v.toFixed(0):l.v.toFixed(1)}</text>
+        </g>
+      ))}
+      <line x1={YW} y1={VOFF} x2={W} y2={VOFF} stroke="#0e0e22" strokeWidth="1"/>
+      <line x1={YW} y1={VOFF+VH} x2={W} y2={VOFF+VH} stroke="#0e0e22" strokeWidth="1"/>
+      <text x={YW+4} y={VOFF+11} fontSize="8" fill="#1e2540" fontFamily={C.font}>VOL</text>
+      {xLbls.map((l,i)=><text key={i} x={l.x} y={VOFF+VH+14} textAnchor="middle" fontSize={fs?"9":"7.5"} fill="#3a4060" fontFamily={C.font}>{l.l}</text>)}
+      <g clipPath={`url(#cc${uid})`}>
+        {vis.map((c,i)=>{const gi=si+i,bx=i2x(gi,si,ei),bh=Math.max(2,(c.v/vmx)*(VH-3));const an=(anomalies||[]).find(a=>a.idx===gi),sp=c.v>avgV*1.75;return<rect key={i} x={bx-bW/2} y={VOFF+VH-2-bh} width={bW} height={bh} fill={an?(an.type==="buy"?C.green:C.red):sp?C.accent:"#1a1a30"} opacity={an?.95:sp?.7:.4}/>;
+        })}
+      </g>
+      <g clipPath={`url(#cc${uid})`}>
+        <path d={pArea} fill={`url(#cg${uid})`}/>
+        <path d={pLine} fill="none" stroke={pos?C.green:C.red} strokeWidth="2" strokeLinejoin="round"/>
+        {maPath&&<path d={maPath} fill="none" stroke={C.yellow} strokeWidth="1.5" strokeDasharray="6,3" opacity=".9"/>}
+      </g>
+      <g clipPath={`url(#cc${uid})`}>
+        {(anomalies||[]).filter(an=>an.idx>=si&&an.idx<=ei).map((an,i)=>{
+          const x=i2x(an.idx,si,ei),y=p2y(an.price,mn,mx),col=an.type==="buy"?C.green:C.red,B=an.type==="buy";
+          const vbh=Math.max(2,((candles[an.idx]?.v||0)/vmx)*(VH-3));
+          const volY=VOFF+VH-2-vbh,tagY=B?y-(fs?42:28):y+(fs?14:10);
+          return(<g key={i}>
+            <line x1={x} y1={B?y+(fs?12:7):y-(fs?12:7)} x2={x} y2={volY} stroke={col} strokeWidth="1.2" strokeDasharray="4,3" opacity=".45"/>
+            <circle cx={x} cy={y} r={fs?15:9} fill={col} opacity=".07"/>
+            <circle cx={x} cy={y} r={fs?10:6} fill="none" stroke={col} strokeWidth={fs?1.5:1} opacity=".5"/>
+            <circle cx={x} cy={y} r={fs?7:4.5} fill={col} opacity=".95"/>
+            <text x={x} y={y+1} textAnchor="middle" dominantBaseline="middle" fontSize={fs?"9":"6"} fill="#000" fontWeight="900">{B?"B":"S"}</text>
+            <rect x={x-(fs?32:20)} y={tagY} width={fs?64:40} height={fs?26:14} rx={4} fill={col} opacity=".9"/>
+            <text x={x} y={tagY+(fs?10:9)} textAnchor="middle" fontSize={fs?"8":"6.5"} fill="#000" fontWeight="700">{B?"נפח⬆":"נפח⬇"} z={an.z}σ</text>
+            {fs&&<text x={x} y={tagY+22} textAnchor="middle" fontSize="7.5" fill="#000">${an.price?.toFixed(0)} · {an.shares}</text>}
+          </g>);
+        })}
+      </g>
+      <line x1={YW} y1={curY} x2={W} y2={curY} stroke="#fff" strokeWidth=".7" strokeDasharray="5,4" opacity=".15"/>
+      <rect x={0} y={curY-8} width={YW-1} height={16} fill={pos?C.green:C.red} opacity=".9"/>
+      <text x={YW/2} y={curY+4} textAnchor="middle" fontSize={fs?"9.5":"8.5"} fill="#000" fontWeight="900">${candles[ei]?.c?.toFixed(1)}</text>
+      {ch&&(()=>{
+        const{ix,iy,c,d:cd2,an}=ch;
+        const pL=`$${c.c>=1000?c.c.toFixed(0):c.c.toFixed(2)}`;
+        const dX=Math.max(YW+28,Math.min(W-28,ix));
+        const bx=ix+14>W-140?ix-142:ix+14,by=Math.max(10,iy-36),bH=an?92:56;
+        return(<g style={{pointerEvents:"none"}}>
+          <line x1={ix} y1={0} x2={ix} y2={VOFF+VH} stroke="#fff" strokeWidth="1" strokeDasharray="4,3" opacity=".28"/>
+          <line x1={YW} y1={iy} x2={W} y2={iy} stroke="#fff" strokeWidth="1" strokeDasharray="4,3" opacity=".18"/>
+          <circle cx={ix} cy={iy} r="5" fill={pos?C.green:C.red} stroke="#fff" strokeWidth="1.5"/>
+          <rect x={0} y={iy-9} width={YW-1} height={18} fill={pos?C.green:C.red}/>
+          <text x={YW/2} y={iy+5} textAnchor="middle" fontSize="9.5" fill="#000" fontWeight="900">{pL}</text>
+          <rect x={dX-28} y={VOFF+VH+1} width={56} height={16} rx={4} fill={C.accent} opacity=".9"/>
+          <text x={dX} y={VOFF+VH+12} textAnchor="middle" fontSize="9.5" fill="#fff" fontWeight="700">{cd2}</text>
+          <rect x={bx} y={by} width={136} height={bH} rx={7} fill="#08081a" stro
