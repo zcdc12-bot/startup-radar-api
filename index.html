@@ -1,46 +1,41 @@
-
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>StartupRadar Pro</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#090910;font-family:'Heebo',sans-serif;color:#e0e0f0}
+body{background:#090910;color:#e0e0f0;font-family:'Heebo',sans-serif;direction:rtl}
 ::-webkit-scrollbar{display:none}
-.tap{transition:all .15s;cursor:pointer}
+.tap{transition:all .15s;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tap:active{opacity:.7;transform:scale(.97)}
-input,textarea{outline:none}
+input,textarea{outline:none;font-family:inherit}
 input::placeholder,textarea::placeholder{color:#334}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes sIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.card{background:#0f0f1a;border:1px solid #1c1c2e;border-radius:12px;padding:14px;margin-bottom:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.btn{border:none;border-radius:10px;padding:12px;font-family:inherit;font-weight:700;cursor:pointer;font-size:13px}
+.tag{font-size:9px;font-weight:700;border-radius:5px;padding:2px 7px;display:inline-block}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script type="text/babel">
-const { useState, useEffect, useRef } = React;
-
+<div id="app"></div>
+<script>
 const PROXY = "https://startup-radar-api.vercel.app";
-const FK    = "d8j5sqpr01qgth6in83gd8j5sqpr01qgth6in840";
-const C = {
-  bg:"#090910",card:"#0f0f1a",border:"#1c1c2e",accent:"#7c6aff",
-  green:"#00f5c4",red:"#ff5c7a",yellow:"#ffd166",orange:"#ff9f43",
-  text:"#e0e0f0",muted:"#556",font:"'Heebo',sans-serif"
-};
+const FK = "d8j5sqpr01qgth6in83gd8j5sqpr01qgth6in840";
+const C = {bg:"#090910",card:"#0f0f1a",border:"#1c1c2e",accent:"#7c6aff",green:"#00f5c4",red:"#ff5c7a",yellow:"#ffd166",orange:"#ff9f43",muted:"#556"};
 
-// ── Cache ──
+// Cache
 const CACHE={};
 const setC=(k,v,age=1800000)=>{CACHE[k]={v,ts:Date.now(),age};return v;};
 const getC=(k)=>{const c=CACHE[k];return c&&Date.now()-c.ts<(c.age||1800000)?c.v:null;};
 
 const fV=n=>{if(!n)return"—";if(n>=1e12)return(n/1e12).toFixed(1)+"T";if(n>=1e9)return(n/1e9).toFixed(1)+"B";if(n>=1e6)return(n/1e6).toFixed(1)+"M";if(n>=1e3)return(n/1e3).toFixed(0)+"K";return""+n;};
-const RC=r=>r==="Strong Buy"?C.green:r==="Buy"?"#7fe0b0":r==="Hold"?C.yellow:C.red;
 const fmtD=t=>{const d=new Date(t*1000);return`${d.getDate()}/${d.getMonth()+1}`;};
+const RC=r=>r==="Strong Buy"?"#00f5c4":r==="Buy"?"#7fe0b0":r==="Hold"?"#ffd166":"#ff5c7a";
 
 const META={
   NVDA:{n:"NVIDIA",s:"Semiconductors"},AAPL:{n:"Apple",s:"Consumer Tech"},
@@ -51,27 +46,45 @@ const META={
   MNDY:{n:"Monday.com",s:"SaaS IL"},CHKP:{n:"Check Point",s:"Cyber IL"},
   CYBR:{n:"CyberArk",s:"Cyber IL"},TEVA:{n:"Teva",s:"Pharma IL"},
   PANW:{n:"Palo Alto",s:"Cybersecurity"},SPY:{n:"S&P 500 ETF",s:"ETF"},
-  QQQ:{n:"Nasdaq ETF",s:"ETF"},NVDA:{n:"NVIDIA",s:"Semiconductors"},
+  QQQ:{n:"Nasdaq ETF",s:"ETF"},GLD:{n:"Gold ETF",s:"ETF"},
   PLTR:{n:"Palantir",s:"AI/Data"},SOFI:{n:"SoFi",s:"Fintech"},
   MSTR:{n:"MicroStrategy",s:"Bitcoin"},NET:{n:"Cloudflare",s:"Cloud Sec"},
   UBER:{n:"Uber",s:"Mobility"},NFLX:{n:"Netflix",s:"Streaming"},
-  GLD:{n:"Gold ETF",s:"ETF"},V:{n:"Visa",s:"Payments"},
-  JPM:{n:"JPMorgan",s:"Banking"},LLY:{n:"Eli Lilly",s:"Pharma"},
-  ARM:{n:"Arm Holdings",s:"Chip Arch"},SHOP:{n:"Shopify",s:"eCommerce"},
+  V:{n:"Visa",s:"Payments"},JPM:{n:"JPMorgan",s:"Banking"},
+  LLY:{n:"Eli Lilly",s:"Pharma"},ARM:{n:"Arm Holdings",s:"Chip Arch"},
+  SHOP:{n:"Shopify",s:"eCommerce"},INTC:{n:"Intel",s:"Semiconductors"},
 };
 
 const GROUPS={
   "⚡ Mag7":["AAPL","MSFT","GOOGL","AMZN","META","NVDA","TSLA"],
-  "💾 שבבים":["NVDA","AMD","AVGO","TSM","MU","INTC","ARM"],
+  "💾 שבבים":["NVDA","AMD","ARM","INTC","AVGO","TSM"],
   "🔐 סייבר":["CRWD","PANW","CHKP","CYBR","NET"],
   "🏦 פיננסים":["JPM","V","GS","BAC","MA"],
-  "🌐 ישראל":["MNDY","CHKP","CYBR","TEVA","NICE","WIX","GLBE"],
+  "🌐 ישראל":["MNDY","CHKP","CYBR","TEVA","NICE","WIX"],
   "📦 ETFs":["SPY","QQQ","GLD"],
   "🔥 ספקול":["COIN","MSTR","PLTR","SOFI"],
 };
+
 const TRS=[{l:"1D",r:"1d"},{l:"1W",r:"5d"},{l:"1M",r:"1mo"},{l:"3M",r:"3mo"},{l:"6M",r:"6mo"},{l:"1Y",r:"1y"}];
 const MAS=[{l:"ללא",d:0},{l:"MA9",d:9},{l:"MA20",d:20},{l:"MA50",d:50},{l:"MA200",d:200}];
 
+// ── Render helper ──────────────────────────────────────────────
+function h(tag, attrs={}, ...children) {
+  const el = document.createElement(tag);
+  for(const [k,v] of Object.entries(attrs)){
+    if(k==="style"&&typeof v==="object") Object.assign(el.style,v);
+    else if(k.startsWith("on")) el.addEventListener(k.slice(2).toLowerCase(),v);
+    else if(k==="className") el.className=v;
+    else el.setAttribute(k,v);
+  }
+  for(const c of children.flat()){
+    if(c==null||c===false) continue;
+    el.appendChild(typeof c==="string"||typeof c==="number"?document.createTextNode(c):c);
+  }
+  return el;
+}
+
+// ── API ────────────────────────────────────────────────────────
 async function ai(prompt,maxT=800){
   try{
     const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
@@ -85,57 +98,27 @@ async function ai(prompt,maxT=800){
 async function parseJSON(txt){
   try{return JSON.parse(txt.replace(/```json|```/g,"").trim());}catch{return null;}
 }
-
 async function loadStock(sym,range="6mo"){
   const key=`s_${sym}_${range}`;
   const hit=getC(key);if(hit)return hit;
   const r=await fetch(`${PROXY}/api/stock?sym=${sym}&range=${range}`);
-  if(!r.ok) throw new Error(`HTTP ${r.status}`);
+  if(!r.ok)throw new Error(`HTTP ${r.status}`);
   const d=await r.json();
-  if(!d?.price) throw new Error("No price");
-  const result={
-    symbol:sym,name:META[sym]?.n||sym,sector:META[sym]?.s||"",
+  if(!d?.price)throw new Error("No price in response");
+  const result={symbol:sym,name:META[sym]?.n||sym,sector:META[sym]?.s||"",
     price:d.price,chgPct:d.chgPct,volume:d.volume,mktCap:d.mktCap,
-    week52High:d.week52High,week52Low:d.week52Low,
-    candles:d.candles||[],source:"yahoo"
-  };
+    week52High:d.week52High,week52Low:d.week52Low,candles:d.candles||[],source:"yahoo"};
   setC(key,result);
   enrichMeta(sym,result.price);
   return result;
 }
-
 async function enrichMeta(sym,price){
-  const key=`meta_${sym}`;
-  if(getC(key))return;
-  const txt=await ai(`Stock ${sym} ~$${price}. JSON only no markdown:
-{"pe":X,"rating":"Strong Buy|Buy|Hold|Sell","target":X,"description":"2 sentences Hebrew"}`,300);
-  const d=await parseJSON(txt);
-  if(d) setC(key,d,86400000);
+  const key=`meta_${sym}`;if(getC(key))return;
+  const txt=await ai(`Stock ${sym} ~$${price}. JSON only:\n{"pe":X,"rating":"Strong Buy|Buy|Hold|Sell","target":X,"description":"2 sentences Hebrew"}`,300);
+  const d=await parseJSON(txt);if(d)setC(key,d,86400000);
 }
 
-function detectAnomalies(candles){
-  if(!candles||candles.length<15)return[];
-  const vols=candles.map(c=>c.v||0);
-  const avg=vols.reduce((a,b)=>a+b,0)/vols.length;
-  const std=Math.sqrt(vols.reduce((s,v)=>s+(v-avg)**2,0)/vols.length)||1;
-  const ev=[];let last=-10;
-  for(let i=5;i<candles.length-3;i++){
-    if(i-last<10)continue;
-    const v=candles[i].v||0,z=(v-avg)/std;
-    if(z>1.5){
-      const prev=candles[Math.max(0,i-2)].c||candles[i].c;
-      const chg=(candles[i].c-prev)/prev*100;
-      const fwd=(candles[Math.min(i+8,candles.length-1)].c-candles[i].c)/candles[i].c*100;
-      ev.push({idx:i,type:chg>=0?"buy":"sell",price:candles[i].c,
-        vol:v,z:z.toFixed(1),fwdChg:+(fwd.toFixed(1)),
-        shares:fV(v),value:(v*candles[i].c/1e9).toFixed(2),
-        reason:chg>=0?"נפח חריג + עלייה":"נפח חריג + ירידה"});
-      last=i;
-    }
-  }
-  return ev.slice(0,8);
-}
-
+// ── Correlations ───────────────────────────────────────────────
 function calcCorr(candles){
   if(!candles||candles.length<10)return null;
   const P=candles.map(c=>c.c).filter(Boolean);
@@ -154,156 +137,444 @@ function calcCorr(candles){
   }
   const volRatio=dnC?(upV/Math.max(upC,1))/(dnV/Math.max(dnC,1)):1;
   const spikePct=spT?(spUp/spT*100).toFixed(0):"—";
-  const R=P.slice(1).map((p,i)=>(p-P[i])/P[i]*100);
-  const posR=R.filter(r=>r>0),negR=R.filter(r=>r<0);
-  return{pvCorr:pvCorr.toFixed(2),volRatio:volRatio.toFixed(2),
-    spikePct,spT,spUp,
-    avgPos:posR.length?(posR.reduce((a,b)=>a+b,0)/posR.length).toFixed(2):"0",
-    avgNeg:negR.length?(negR.reduce((a,b)=>a+b,0)/negR.length).toFixed(2):"0",n};
+  return{pvCorr:pvCorr.toFixed(2),volRatio:volRatio.toFixed(2),spikePct,spT,spUp,n};
 }
 
-function Spark({prices,pos,w=70,h=24}){
-  if(!prices||prices.length<2)return React.createElement("div",{style:{width:w,height:h}});
-  const mn=Math.min(...prices),mx=Math.max(...prices);
-  const px=i=>(i/(prices.length-1))*w,py=v=>h-((v-mn)/(mx-mn||1))*(h-3)-1;
-  const pts=prices.map((v,i)=>`${px(i)},${py(v)}`).join(" ");
-  const id=`sp${w}${pos?1:0}`;
-  return(
-    <svg width={w} height={h}>
-      <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stopColor={pos?C.green:C.red} stopOpacity="0.3"/>
-        <stop offset="100%" stopColor={pos?C.green:C.red} stopOpacity="0"/>
-      </linearGradient></defs>
-      <path d={`M${pts.split(" ").join(" L")} L${px(prices.length-1)},${h} L0,${h} Z`} fill={`url(#${id})`}/>
-      <polyline points={pts} fill="none" stroke={pos?C.green:C.red} strokeWidth="1.6" strokeLinejoin="round"/>
-    </svg>
-  );
+function detectAnomalies(candles){
+  if(!candles||candles.length<15)return[];
+  const vols=candles.map(c=>c.v||0);
+  const avg=vols.reduce((a,b)=>a+b,0)/vols.length;
+  const std=Math.sqrt(vols.reduce((s,v)=>s+(v-avg)**2,0)/vols.length)||1;
+  const ev=[];let last=-10;
+  for(let i=5;i<candles.length-3;i++){
+    if(i-last<10)continue;
+    const v=candles[i].v||0,z=(v-avg)/std;
+    if(z>1.5){
+      const prev=candles[Math.max(0,i-2)].c||candles[i].c;
+      const chg=(candles[i].c-prev)/prev*100;
+      const fwd=(candles[Math.min(i+8,candles.length-1)].c-candles[i].c)/candles[i].c*100;
+      ev.push({idx:i,type:chg>=0?"buy":"sell",price:candles[i].c,
+        vol:candles[i].v,z:z.toFixed(1),fwdChg:+(fwd.toFixed(1))});
+      last=i;
+    }
+  }
+  return ev.slice(0,8);
 }
 
-function Chart({candles,anomalies,sym,fullscreen=false,onClose}){
-  const [ma,setMa]=useState(MAS[0]);
-  const [ch,setCh]=useState(null);
-  const [wW,setWW]=useState(window.innerWidth);
-  const [wH,setWH]=useState(window.innerHeight);
-  const vRef=useRef({ox:0,sc:1});
-  const dRef=useRef({on:false,sx:0,so:0,mv:false});
-  const pRef=useRef({on:false,sd:0,ssc:1,so:0,mx:0});
-  const [,bump]=useState(0);const rd=()=>bump(n=>n+1);
+// ── SVG Chart (vanilla JS) ──────────────────────────────────────
+function buildChart(candles, anomalies, sym, W) {
+  const PH=130, VH=36, YW=52, CW=W-YW, VOFF=PH+16, TH=VOFF+VH+20;
+  const mn=Math.min(...candles.map(c=>c.l||c.c))*0.998;
+  const mx=Math.max(...candles.map(c=>c.h||c.c))*1.002;
+  const vmx=Math.max(...candles.map(c=>c.v))||1;
+  const avgV=candles.map(c=>c.v||0).reduce((a,b)=>a+b,0)/candles.length;
+  const pos=candles[candles.length-1]?.c>=candles[0]?.c;
+  const p2y=v=>12+(1-(v-mn)/(mx-mn||1))*(PH-20);
+  const i2x=i=>YW+(i/(candles.length-1))*CW;
+  const bW=Math.max(1,CW/candles.length-.5);
 
-  useEffect(()=>{
-    if(!fullscreen)return;
-    const u=()=>{setWW(window.innerWidth);setWH(window.innerHeight);};
-    window.addEventListener("resize",u);return()=>window.removeEventListener("resize",u);
-  },[fullscreen]);
+  const pts=candles.map((c,i)=>`${i2x(i)},${p2y(c.c)}`).join(" ");
+  const pLine=`M${pts.split(" ").join(" L")}`;
+  const pArea=pLine+` L${i2x(candles.length-1)},${PH} L${YW},${PH} Z`;
 
-  if(!candles||candles.length<2)return <div style={{padding:24,textAlign:"center",color:C.muted}}>📊 אין נתוני גרף</div>;
-
-  const W=fullscreen?wW:window.innerWidth-24,PH=fullscreen?Math.round(wH*.58):120;
-  const VH=fullscreen?Math.round(wH*.11):32,YW=fullscreen?62:50,CW=W-YW;
-  const VOFF=PH+18,TH=VOFF+VH+22;
-  const clamp=(ox,sc)=>{sc=Math.max(1,Math.min(12,sc));return{ox:Math.max(-(CW-CW/sc),Math.min(0,ox)),sc};};
-  const getR=()=>{const{ox,sc}=vRef.current,n=candles.length,sf=Math.abs(ox)/CW;return{si:Math.max(0,Math.floor(sf*n)),ei:Math.min(n-1,Math.ceil((sf+1/sc)*n))};};
-  const p2y=(v,mn,mx)=>12+(1-(v-mn)/(mx-mn||1))*(PH-20);
-  const i2x=(i,si,ei)=>YW+((i-si)/Math.max(ei-si,1))*CW;
-
-  const onTS=e=>{if(e.touches.length===1){dRef.current={on:true,sx:e.touches[0].clientX,so:vRef.current.ox,mv:false};pRef.current.on=false;}else if(e.touches.length===2){dRef.current.on=false;const dx=e.touches[1].clientX-e.touches[0].clientX,dy=e.touches[1].clientY-e.touches[0].clientY;pRef.current={on:true,sd:Math.sqrt(dx*dx+dy*dy),ssc:vRef.current.sc,so:vRef.current.ox,mx:(e.touches[0].clientX+e.touches[1].clientX)/2-YW};}};
-  const onTM=e=>{e.preventDefault();if(e.touches.length===1&&dRef.current.on){const dx=e.touches[0].clientX-dRef.current.sx;dRef.current.mv=Math.abs(dx)>4;vRef.current=clamp(dRef.current.so+dx/vRef.current.sc,vRef.current.sc);setCh(null);rd();}else if(e.touches.length===2&&pRef.current.on){const dx=e.touches[1].clientX-e.touches[0].clientX,dy=e.touches[1].clientY-e.touches[0].clientY,dist=Math.sqrt(dx*dx+dy*dy),nsc=pRef.current.ssc*(dist/pRef.current.sd),mf=pRef.current.mx/CW;vRef.current=clamp(pRef.current.so-mf*CW*(1/nsc-1/pRef.current.ssc),nsc);rd();}};
-  const onTE=()=>{dRef.current.on=false;pRef.current.on=false;};
-  const onMD=e=>{dRef.current={on:true,sx:e.clientX,so:vRef.current.ox,mv:false};setCh(null);};
-  const onMU=()=>{dRef.current.on=false;};
-  const onML=()=>{dRef.current.on=false;setCh(null);};
-  const onWh=e=>{e.preventDefault();const f=e.deltaY<0?1.13:0.88,mf=(e.clientX-YW)/CW,o=vRef.current.sc,n2=o*f;vRef.current=clamp(vRef.current.ox-mf*CW*(1/n2-1/o),n2);rd();};
-  const onMM=e=>{
-    const rect=e.currentTarget.getBoundingClientRect(),cx=e.clientX-rect.left,cy=e.clientY-rect.top;
-    if(dRef.current.on){const dx=e.clientX-dRef.current.sx;dRef.current.mv=Math.abs(dx)>4;vRef.current=clamp(dRef.current.so+dx/vRef.current.sc,vRef.current.sc);setCh(null);rd();return;}
-    if(cx<YW||cy>VOFF+VH){setCh(null);return;}
-    const{si,ei}=getR(),idx=Math.max(si,Math.min(ei,Math.round(si+(cx-YW)/CW*(ei-si))));
-    const c=candles[idx],sl=candles.slice(si,ei+1);
-    const mn=Math.min(...sl.map(x=>x.l||x.c))*0.998,mx=Math.max(...sl.map(x=>x.h||x.c))*1.002;
-    const an=(anomalies||[]).find(a=>Math.abs(a.idx-idx)<=2)||null;
-    setCh({idx,c,ix:i2x(idx,si,ei),iy:p2y(c.c,mn,mx),d:fmtD(c.t),an});
-  };
-
-  const{si,ei}=getR();
-  const vis=candles.slice(si,ei+1);
-  const mn=Math.min(...vis.map(c=>c.l||c.c))*0.998,mx=Math.max(...vis.map(c=>c.h||c.c))*1.002;
-  const vmx=Math.max(...vis.map(c=>c.v))||1,avgV=candles.map(c=>c.v||0).reduce((a,b)=>a+b,0)/candles.length;
-  const pos=vis[vis.length-1]?.c>=vis[0]?.c;
-  const bW=Math.max(1,CW/(ei-si+1)-.8);
-  const ppts=vis.map((c,i)=>`${i2x(si+i,si,ei)},${p2y(c.c,mn,mx)}`);
-  const pLine="M"+ppts.join(" L");
-  const pArea=pLine+` L${i2x(ei,si,ei)},${PH} L${YW},${PH} Z`;
+  const uid=`${sym}${Date.now()}`;
   let maPath="";
-  if(ma.d>0){const ml=candles.map((_,i)=>i<ma.d-1?null:candles.slice(i-ma.d+1,i+1).reduce((s,c)=>s+(c.c||0),0)/ma.d);const mp=[];for(let i=si;i<=ei;i++){if(ml[i]!=null)mp.push(`${i2x(i,si,ei)},${p2y(ml[i],mn,mx)}`);}if(mp.length>1)maPath="M"+mp.join(" L");}
-  const lastMA=ma.d>0?(()=>{const ml=candles.map((_,i)=>i<ma.d-1?null:candles.slice(i-ma.d+1,i+1).reduce((s,c)=>s+(c.c||0),0)/ma.d);return[...ml.slice(0,ei+1)].filter(Boolean).pop();})():null;
-  const yLbls=Array.from({length:5},(_,i)=>{const v=mn+(mx-mn)*i/4;return{v,y:p2y(v,mn,mx)};}).reverse();
-  const numX=Math.min(6,ei-si);
-  const xLbls=Array.from({length:numX+1},(_,i)=>{const idx2=si+Math.round(i*(ei-si)/numX);return{idx2,l:fmtD(candles[idx2]?.t||0),x:i2x(idx2,si,ei)};});
-  const curY=p2y(candles[ei]?.c||0,mn,mx);
-  const fs=fullscreen;
-  const uid=`${sym}${fs?1:0}`;
+  const yLbls=Array.from({length:5},(_,i)=>{const v=mn+(mx-mn)*i/4;return{v,y:p2y(v)};}).reverse();
+  const xIdxs=[0,Math.floor(candles.length*.25),Math.floor(candles.length*.5),Math.floor(candles.length*.75),candles.length-1];
 
-  const svgEl=(
-    <svg width={W} height={TH} style={{display:"block",userSelect:"none"}}>
-      <defs>
-        <linearGradient id={`cg${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={pos?C.green:C.red} stopOpacity="0.2"/>
-          <stop offset="100%" stopColor={pos?C.green:C.red} stopOpacity="0"/>
-        </linearGradient>
-        <clipPath id={`cc${uid}`}><rect x={YW} y={0} width={CW} height={TH}/></clipPath>
-      </defs>
-      <rect x={0} y={0} width={YW-1} height={TH} fill="#05050c"/>
-      <line x1={YW} y1={0} x2={YW} y2={TH} stroke={C.border} strokeWidth="1"/>
-      {yLbls.map((l,i)=>(
-        <g key={i}>
-          <line x1={YW} y1={l.y} x2={W} y2={l.y} stroke="#0e0e22" strokeWidth="1"/>
-          <text x={YW-4} y={l.y+4} textAnchor="end" fontSize={fs?"9.5":"8"} fill="#3a4060" fontFamily={C.font}>${l.v>=1000?l.v.toFixed(0):l.v.toFixed(1)}</text>
-        </g>
-      ))}
-      <line x1={YW} y1={VOFF} x2={W} y2={VOFF} stroke="#0e0e22" strokeWidth="1"/>
-      <line x1={YW} y1={VOFF+VH} x2={W} y2={VOFF+VH} stroke="#0e0e22" strokeWidth="1"/>
-      <text x={YW+4} y={VOFF+11} fontSize="8" fill="#1e2540" fontFamily={C.font}>VOL</text>
-      {xLbls.map((l,i)=><text key={i} x={l.x} y={VOFF+VH+14} textAnchor="middle" fontSize={fs?"9":"7.5"} fill="#3a4060" fontFamily={C.font}>{l.l}</text>)}
-      <g clipPath={`url(#cc${uid})`}>
-        {vis.map((c,i)=>{const gi=si+i,bx=i2x(gi,si,ei),bh=Math.max(2,(c.v/vmx)*(VH-3));const an=(anomalies||[]).find(a=>a.idx===gi),sp=c.v>avgV*1.75;return<rect key={i} x={bx-bW/2} y={VOFF+VH-2-bh} width={bW} height={bh} fill={an?(an.type==="buy"?C.green:C.red):sp?C.accent:"#1a1a30"} opacity={an?.95:sp?.7:.4}/>;
-        })}
-      </g>
-      <g clipPath={`url(#cc${uid})`}>
-        <path d={pArea} fill={`url(#cg${uid})`}/>
-        <path d={pLine} fill="none" stroke={pos?C.green:C.red} strokeWidth="2" strokeLinejoin="round"/>
-        {maPath&&<path d={maPath} fill="none" stroke={C.yellow} strokeWidth="1.5" strokeDasharray="6,3" opacity=".9"/>}
-      </g>
-      <g clipPath={`url(#cc${uid})`}>
-        {(anomalies||[]).filter(an=>an.idx>=si&&an.idx<=ei).map((an,i)=>{
-          const x=i2x(an.idx,si,ei),y=p2y(an.price,mn,mx),col=an.type==="buy"?C.green:C.red,B=an.type==="buy";
-          const vbh=Math.max(2,((candles[an.idx]?.v||0)/vmx)*(VH-3));
-          const volY=VOFF+VH-2-vbh,tagY=B?y-(fs?42:28):y+(fs?14:10);
-          return(<g key={i}>
-            <line x1={x} y1={B?y+(fs?12:7):y-(fs?12:7)} x2={x} y2={volY} stroke={col} strokeWidth="1.2" strokeDasharray="4,3" opacity=".45"/>
-            <circle cx={x} cy={y} r={fs?15:9} fill={col} opacity=".07"/>
-            <circle cx={x} cy={y} r={fs?10:6} fill="none" stroke={col} strokeWidth={fs?1.5:1} opacity=".5"/>
-            <circle cx={x} cy={y} r={fs?7:4.5} fill={col} opacity=".95"/>
-            <text x={x} y={y+1} textAnchor="middle" dominantBaseline="middle" fontSize={fs?"9":"6"} fill="#000" fontWeight="900">{B?"B":"S"}</text>
-            <rect x={x-(fs?32:20)} y={tagY} width={fs?64:40} height={fs?26:14} rx={4} fill={col} opacity=".9"/>
-            <text x={x} y={tagY+(fs?10:9)} textAnchor="middle" fontSize={fs?"8":"6.5"} fill="#000" fontWeight="700">{B?"נפח⬆":"נפח⬇"} z={an.z}σ</text>
-            {fs&&<text x={x} y={tagY+22} textAnchor="middle" fontSize="7.5" fill="#000">${an.price?.toFixed(0)} · {an.shares}</text>}
-          </g>);
-        })}
-      </g>
-      <line x1={YW} y1={curY} x2={W} y2={curY} stroke="#fff" strokeWidth=".7" strokeDasharray="5,4" opacity=".15"/>
-      <rect x={0} y={curY-8} width={YW-1} height={16} fill={pos?C.green:C.red} opacity=".9"/>
-      <text x={YW/2} y={curY+4} textAnchor="middle" fontSize={fs?"9.5":"8.5"} fill="#000" fontWeight="900">${candles[ei]?.c?.toFixed(1)}</text>
-      {ch&&(()=>{
-        const{ix,iy,c,d:cd2,an}=ch;
-        const pL=`$${c.c>=1000?c.c.toFixed(0):c.c.toFixed(2)}`;
-        const dX=Math.max(YW+28,Math.min(W-28,ix));
-        const bx=ix+14>W-140?ix-142:ix+14,by=Math.max(10,iy-36),bH=an?92:56;
-        return(<g style={{pointerEvents:"none"}}>
-          <line x1={ix} y1={0} x2={ix} y2={VOFF+VH} stroke="#fff" strokeWidth="1" strokeDasharray="4,3" opacity=".28"/>
-          <line x1={YW} y1={iy} x2={W} y2={iy} stroke="#fff" strokeWidth="1" strokeDasharray="4,3" opacity=".18"/>
-          <circle cx={ix} cy={iy} r="5" fill={pos?C.green:C.red} stroke="#fff" strokeWidth="1.5"/>
-          <rect x={0} y={iy-9} width={YW-1} height={18} fill={pos?C.green:C.red}/>
-          <text x={YW/2} y={iy+5} textAnchor="middle" fontSize="9.5" fill="#000" fontWeight="900">{pL}</text>
-          <rect x={dX-28} y={VOFF+VH+1} width={56} height={16} rx={4} fill={C.accent} opacity=".9"/>
-          <text x={dX} y={VOFF+VH+12} textAnchor="middle" fontSize="9.5" fill="#fff" fontWeight="700">{cd2}</text>
-          <rect x={bx} y={by} width={136} height={bH} rx={7} fill="#08081a" stro
+  const ns="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(ns,"svg");
+  svg.setAttribute("width",W); svg.setAttribute("height",TH);
+  svg.style.display="block"; svg.style.userSelect="none";
+
+  const mk=(tag,attrs)=>{const e=document.createElementNS(ns,tag);for(const[k,v]of Object.entries(attrs))e.setAttribute(k,v);return e;};
+  const txt=(tag,attrs,text)=>{const e=mk(tag,attrs);e.textContent=text;return e;};
+
+  // defs
+  const defs=mk("defs",{});
+  const grad=mk("linearGradient",{id:`g${uid}`,x1:"0",y1:"0",x2:"0",y2:"1"});
+  const s1=mk("stop",{"offset":"0%","stop-color":pos?C.green:C.red,"stop-opacity":"0.2"});
+  const s2=mk("stop",{"offset":"100%","stop-color":pos?C.green:C.red,"stop-opacity":"0"});
+  const clip=mk("clipPath",{id:`c${uid}`});
+  const clipR=mk("rect",{x:YW,y:0,width:CW,height:TH});
+  clip.appendChild(clipR); grad.append(s1,s2); defs.append(grad,clip); svg.appendChild(defs);
+
+  // Y axis bg
+  svg.appendChild(mk("rect",{x:0,y:0,width:YW-1,height:TH,fill:"#05050c"}));
+  svg.appendChild(mk("line",{x1:YW,y1:0,x2:YW,y2:TH,stroke:C.border,"stroke-width":"1"}));
+
+  // Y labels + grid
+  for(const l of yLbls){
+    svg.appendChild(mk("line",{x1:YW,y1:l.y,x2:W,y2:l.y,stroke:"#0e0e22","stroke-width":"1"}));
+    svg.appendChild(txt("text",{x:YW-4,y:l.y+4,"text-anchor":"end","font-size":"8",fill:"#3a4060"},"$"+(l.v>=1000?l.v.toFixed(0):l.v.toFixed(1))));
+  }
+
+  // Volume area
+  svg.appendChild(mk("line",{x1:YW,y1:VOFF,x2:W,y2:VOFF,stroke:"#0e0e22","stroke-width":"1"}));
+  svg.appendChild(mk("line",{x1:YW,y1:VOFF+VH,x2:W,y2:VOFF+VH,stroke:"#0e0e22","stroke-width":"1"}));
+  svg.appendChild(txt("text",{x:YW+4,y:VOFF+11,"font-size":"8",fill:"#1e2540"},"VOL"));
+
+  // X labels
+  for(const i of xIdxs){
+    svg.appendChild(txt("text",{x:i2x(i),y:VOFF+VH+14,"text-anchor":"middle","font-size":"7.5",fill:"#3a4060"},fmtD(candles[i]?.t||0)));
+  }
+
+  // Vol bars
+  const volG=mk("g",{"clip-path":`url(#c${uid})`});
+  for(let i=0;i<candles.length;i++){
+    const v=candles[i].v||0, bh=Math.max(2,(v/vmx)*(VH-3));
+    const an=(anomalies||[]).find(a=>a.idx===i);
+    const sp=v>avgV*1.75;
+    const fill=an?(an.type==="buy"?C.green:C.red):sp?C.accent:"#1a1a30";
+    const op=an?.95:sp?.7:.4;
+    const r=mk("rect",{x:i2x(i)-bW/2,y:VOFF+VH-2-bh,width:bW,height:bh,fill,opacity:op});
+    volG.appendChild(r);
+  }
+  svg.appendChild(volG);
+
+  // Price area + line
+  const priceG=mk("g",{"clip-path":`url(#c${uid})`});
+  priceG.appendChild(mk("path",{d:pArea,fill:`url(#g${uid})`}));
+  priceG.appendChild(mk("path",{d:pLine,fill:"none",stroke:pos?C.green:C.red,"stroke-width":"2","stroke-linejoin":"round"}));
+  svg.appendChild(priceG);
+
+  // Anomaly markers
+  const anG=mk("g",{"clip-path":`url(#c${uid})`});
+  for(const an of (anomalies||[])){
+    const x=i2x(an.idx), y=p2y(an.price), col=an.type==="buy"?C.green:C.red, B=an.type==="buy";
+    const vbh=Math.max(2,((candles[an.idx]?.v||0)/vmx)*(VH-3));
+    const volY=VOFF+VH-2-vbh, tagY=B?y-28:y+10;
+    anG.appendChild(mk("line",{x1:x,y1:B?y+7:y-7,x2:x,y2:volY,stroke:col,"stroke-width":"1.2","stroke-dasharray":"4,3",opacity:".45"}));
+    anG.appendChild(mk("circle",{cx:x,cy:y,r:9,fill:col,opacity:".12"}));
+    anG.appendChild(mk("circle",{cx:x,cy:y,r:6,fill:col,opacity:".95"}));
+    const bl=txt("text",{x:x,y:y+1,"text-anchor":"middle","dominant-baseline":"middle","font-size":"7","font-weight":"900",fill:"#000"},B?"B":"S");
+    anG.appendChild(bl);
+    const tr=mk("rect",{x:x-20,y:tagY,width:40,height:14,rx:4,fill:col,opacity:".9"});
+    anG.appendChild(tr);
+    anG.appendChild(txt("text",{x:x,y:tagY+10,"text-anchor":"middle","font-size":"6.5","font-weight":"700",fill:"#000"},`z=${an.z}σ`));
+  }
+  svg.appendChild(anG);
+
+  // Current price
+  const curY=p2y(candles[candles.length-1]?.c||0);
+  svg.appendChild(mk("line",{x1:YW,y1:curY,x2:W,y2:curY,stroke:"#fff","stroke-width":".7","stroke-dasharray":"5,4",opacity:".15"}));
+  svg.appendChild(mk("rect",{x:0,y:curY-8,width:YW-1,height:16,fill:pos?C.green:C.red,opacity:".9"}));
+  svg.appendChild(txt("text",{x:YW/2,y:curY+4,"text-anchor":"middle","font-size":"8.5","font-weight":"900",fill:"#000"},"$"+(candles[candles.length-1]?.c?.toFixed(1)||"")));
+
+  return {svg, pos};
+}
+
+// ── State ──────────────────────────────────────────────────────
+const state = {
+  tab:"stocks", sel:null, trIdx:4, sd:null, anomalies:[], loading:false, err:null,
+  ana:null, anaL:false, wl:["NVDA","AAPL","TSLA","META","MSFT","AMZN","CRWD","COIN","MNDY","CHKP"],
+  sgr:"⚡ Mag7", agr:null, agrL:false, volRes:[], volL:false, vaiN:null, vaiL:false, vfilt:"הכל",
+  aiQ:"", aiAns:null, aiL:false, search:""
+};
+
+function setState(updates) {
+  Object.assign(state, updates);
+  render();
+}
+
+// ── App render (full re-render, simple & fast) ─────────────────
+function render() {
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+  const s = state;
+
+  // HEADER
+  const header = h("div",{style:{background:C.card,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:90}},
+    h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 14px 0"}},
+      h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+        h("div",{style:{width:28,height:28,background:"linear-gradient(135deg,#7c6aff,#00f5c4)",borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}},"⚡"),
+        h("div",{},
+          h("div",{style:{fontWeight:900,fontSize:15,color:"#fff"}},"StartupRadar Pro"),
+          h("div",{style:{fontSize:8,color:C.green}},"● Yahoo Finance אמיתי · Claude AI")
+        )
+      ),
+      h("div",{style:{fontSize:9,color:C.green,background:`${C.green}15`,borderRadius:5,padding:"2px 7px",fontWeight:700}},"WS ●")
+    ),
+    // Tabs
+    h("div",{style:{display:"flex"}},
+      ...["stocks","vol","scanner","ai"].map((id,i)=>{
+        const lbl=["📈 מניות","🔥 Volume","🔍 סורק","🤖 AI"][i];
+        return h("button",{className:"tap",style:{flex:1,background:"none",border:"none",padding:"8px 0",color:s.tab===id?C.accent:C.muted,fontWeight:700,fontSize:10,borderBottom:s.tab===id?`2px solid ${C.accent}`:"2px solid transparent",fontFamily:"inherit",cursor:"pointer"},onclick:()=>setState({tab:id})},lbl);
+      })
+    )
+  );
+  app.appendChild(header);
+
+  const content = h("div",{style:{padding:12}});
+
+  // ── WATCHLIST ──
+  if(s.tab==="stocks"&&!s.sel){
+    const searchRow = h("div",{style:{display:"flex",gap:8,marginBottom:10}},
+      h("input",{style:{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:10,padding:"9px 12px",color:"#e0e0f0",fontSize:13,direction:"ltr"},placeholder:"הזן סמל: NVDA, AAPL...",value:s.search,
+        oninput:e=>setState({search:e.target.value}),
+        onkeydown:e=>{if(e.key==="Enter"&&s.search.trim())setState({sel:s.search.trim().toUpperCase(),search:""});}}),
+      s.search.trim()?h("button",{className:"tap",style:{background:`${C.accent}20`,border:`1px solid ${C.accent}`,borderRadius:9,padding:"9px 14px",color:C.accent,fontWeight:700,fontSize:13,cursor:"pointer"},onclick:()=>setState({sel:s.search.trim().toUpperCase(),search:""})},"→"):null
+    );
+    content.appendChild(searchRow);
+    content.appendChild(h("div",{style:{fontSize:10,color:C.muted,marginBottom:8}},"⭐ רשימת מעקב — נתונים אמיתיים"));
+
+    const grid = h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}},
+      ...s.wl.map(sym=>{
+        const cd=getC(`s_${sym}_6mo`), price=cd?.price, pct=cd?.chgPct||0, pos=pct>=0;
+        return h("div",{className:"tap",style:{background:C.card,border:`1px solid ${cd?C.accent+"40":C.border}`,borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",animation:"sIn .2s ease"},
+          onclick:()=>loadStockAndShow(sym)},
+          h("div",{},
+            h("div",{style:{fontWeight:900,fontSize:15,color:"#fff"}},sym),
+            price?h("div",{style:{fontSize:10,color:pos?C.green:C.red,fontWeight:700}},`$${(+price).toFixed(2)} ${pos?"▲":"▼"}${Math.abs(pct).toFixed(1)}%`):h("div",{style:{fontSize:9,color:C.muted}},"לחץ לטעינה"),
+            cd?h("div",{style:{fontSize:8,color:C.accent}},"✓ Yahoo"):null
+          ),
+          h("div",{style:{color:C.accent,fontSize:20}},"›")
+        );
+      })
+    );
+    content.appendChild(grid);
+  }
+
+  // ── STOCK DETAIL ──
+  if(s.tab==="stocks"&&s.sel){
+    const backBtn = h("button",{className:"tap",style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:9,padding:"7px 14px",color:"#e0e0f0",fontSize:12,marginBottom:12,cursor:"pointer"},
+      onclick:()=>setState({sel:null,sd:null,anomalies:[],err:null,ana:null})},"← חזרה");
+    content.appendChild(backBtn);
+
+    if(s.loading){
+      content.appendChild(h("div",{style:{textAlign:"center",padding:40,color:C.muted}},
+        h("div",{style:{fontSize:32,marginBottom:10,animation:"pulse 1s infinite"}},"📡"),
+        h("div",{style:{fontSize:14,color:"#fff",marginBottom:4}},`טוען ${s.sel} מ-Yahoo Finance...`)
+      ));
+    } else if(s.err){
+      content.appendChild(h("div",{style:{background:`${C.red}12`,border:`1px solid ${C.red}40`,borderRadius:12,padding:18}},
+        h("div",{style:{fontSize:13,color:C.red,fontWeight:700,marginBottom:8,textAlign:"center"}},"⚠️ שגיאה"),
+        h("div",{style:{fontSize:10,color:"#aaa",wordBreak:"break-all",direction:"ltr",background:"#000",padding:8,borderRadius:6,fontFamily:"monospace"}},s.err),
+        h("button",{className:"tap",style:{marginTop:12,width:"100%",background:`${C.accent}20`,border:`1px solid ${C.accent}`,borderRadius:8,padding:"8px 0",color:C.accent,fontSize:12,fontWeight:700,cursor:"pointer"},onclick:()=>loadStockAndShow(s.sel)},"↺ נסה שוב")
+      ));
+    } else if(s.sd){
+      const sd=s.sd, em=getC(`meta_${s.sel}`), pos=(sd.chgPct||0)>=0;
+
+      // Quote card
+      const quoteCard = h("div",{className:"card"},
+        h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}},
+          h("div",{},
+            h("div",{style:{fontWeight:900,fontSize:22,color:"#fff"}},sd.symbol),
+            h("div",{style:{fontSize:11,color:C.muted}},`${sd.name} · ${sd.sector}`),
+            em?.rating?h("span",{className:"tag",style:{color:RC(em.rating),background:RC(em.rating)+"20",marginTop:4}},em.rating):null
+          ),
+          h("div",{style:{textAlign:"left"}},
+            h("div",{style:{fontWeight:900,fontSize:24,color:"#fff"}},`$${(+sd.price||0).toFixed(2)}`),
+            h("div",{style:{color:pos?C.green:C.red,fontSize:13,fontWeight:700}},`${pos?"▲":"▼"}${Math.abs(sd.chgPct||0).toFixed(2)}%`),
+            em?.target?h("div",{style:{fontSize:10,color:C.muted}},`יעד: $${em.target}`):null
+          )
+        ),
+        em?.description?h("div",{style:{fontSize:11,color:"#8898aa",marginTop:10,lineHeight:1.6,padding:"7px 10px",background:"#07070f",borderRadius:7}},em.description):null,
+        h("div",{style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5,marginTop:10}},
+          ...[{l:"שווי שוק",v:fV(sd.mktCap)},{l:"P/E",v:em?.pe||"—"},{l:"52W שיא",v:sd.week52High?`$${(+sd.week52High).toFixed(0)}`:"—"},{l:"52W שפל",v:sd.week52Low?`$${(+sd.week52Low).toFixed(0)}`:"—"},{l:"נפח",v:fV(sd.volume)},{l:"שינוי",v:`${pos?"+":""}${(sd.chgPct||0).toFixed(2)}%`}].map(i=>
+            h("div",{style:{background:"#07070f",borderRadius:7,padding:"6px 8px",textAlign:"center"}},
+              h("div",{style:{fontSize:8,color:C.muted}},i.l),
+              h("div",{style:{fontSize:11,fontWeight:700,color:"#e0e0f0",marginTop:2}},i.v)
+            )
+          )
+        )
+      );
+      content.appendChild(quoteCard);
+
+      // Chart
+      const chartCard = h("div",{className:"card"});
+      chartCard.appendChild(h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}},
+        h("div",{style:{fontSize:10,color:C.green,fontWeight:700}},"📊 Yahoo Finance — נתונים אמיתיים"),
+        h("div",{style:{fontSize:9,color:C.muted}},`${sd.candles?.length||0} נרות`)
+      ));
+      // Range buttons
+      chartCard.appendChild(h("div",{style:{display:"flex",gap:4,marginBottom:8}},
+        ...TRS.map((t,i)=>h("button",{className:"tap",style:{flex:1,background:s.trIdx===i?`${C.accent}25`:"transparent",border:`1px solid ${s.trIdx===i?C.accent:C.border}`,borderRadius:7,padding:"5px 0",color:s.trIdx===i?C.accent:C.muted,fontSize:11,fontWeight:700,cursor:"pointer"},onclick:()=>{setState({trIdx:i});loadStockAndShow(s.sel,TRS[i].r);}},t.l))
+      ));
+      if(sd.candles?.length>2){
+        const W = Math.min(window.innerWidth-24, 456);
+        const {svg} = buildChart(sd.candles, s.anomalies, s.sel, W);
+        chartCard.appendChild(svg);
+        chartCard.appendChild(h("div",{style:{display:"flex",gap:8,padding:"3px 4px",fontSize:8.5,marginTop:4,flexWrap:"wrap"}},
+          h("span",{style:{color:pos?C.green:C.red}},"─ Yahoo Finance"),
+          h("span",{style:{color:C.green}},"● B נפח⬆"),
+          h("span",{style:{color:C.red}},"● S נפח⬇")
+        ));
+      }
+      content.appendChild(chartCard);
+
+      // Correlations
+      const corr=calcCorr(sd.candles);
+      if(corr){
+        const corrCard = h("div",{className:"card"},
+          h("div",{style:{fontSize:10,color:C.muted,textTransform:"uppercase",letterSpacing:"1px",fontWeight:700,marginBottom:10}},`📊 קורלציות אמיתיות — ${corr.n} ימים`),
+          h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:10}},
+            ...[{l:"קורלציה מחיר-נפח",v:corr.pvCorr,c:Math.abs(corr.pvCorr)>.6?C.green:Math.abs(corr.pvCorr)>.3?C.yellow:C.red},
+               {l:"נפח עלייה/ירידה",v:corr.volRatio+"x",c:Math.abs(corr.volRatio-1)>.15?C.green:C.yellow},
+               {l:"Spike→עלייה",v:corr.spikePct+"%",c:+corr.spikePct>=60?C.green:C.yellow},
+               {l:"סה״כ פיקים",v:corr.spT+" מקרים",c:C.muted}].map(i=>
+              h("div",{style:{background:"#07070f",borderRadius:8,padding:"8px 10px"}},
+                h("div",{style:{fontSize:8,color:C.muted,marginBottom:3}},i.l),
+                h("div",{style:{fontSize:18,fontWeight:900,color:i.c}},i.v)
+              )
+            )
+          ),
+          h("div",{style:{padding:"8px 10px",background:`${corr.volRatio>1.1?C.green:C.red}18`,border:`1px solid ${corr.volRatio>1.1?C.green:C.red}30`,borderRadius:8}},
+            h("span",{style:{fontSize:11,color:corr.volRatio>1.1?C.green:C.red,fontWeight:700}},corr.volRatio>1.1?"💡 נפח גבוה ביום עלייה — bullish":"⚠️ נפח גבוה ביום ירידה — bearish")
+          )
+        );
+        content.appendChild(corrCard);
+      }
+
+      // AI button
+      if(!s.ana){
+        const aiBtn = h("button",{className:"tap btn",style:{width:"100%",background:s.anaL?`${C.accent}20`:"linear-gradient(135deg,#7c6aff,#00f5c4)",color:s.anaL?"#888":"#000",marginBottom:10},
+          onclick:async()=>{
+            if(s.anaL)return;
+            setState({anaL:true});
+            const a=await ai(`ניתוח ${s.sel} בעברית, 4 נקודות מעשיות:\nמחיר: $${sd.price?.toFixed(2)}, שינוי: ${sd.chgPct?.toFixed(2)}%\n52W: $${sd.week52Low?.toFixed(0)}–$${sd.week52High?.toFixed(0)}\n${corr?`קורלציה: ${corr.pvCorr}, נפח: ${corr.volRatio}x`:""}`,700);
+            setState({ana:a,anaL:false});
+          }},s.anaL?"🤖 מנתח...":"🤖 ניתוח מלא + קורלציות");
+        content.appendChild(aiBtn);
+      } else {
+        content.appendChild(h("div",{className:"card",style:{marginBottom:10}},
+          h("div",{style:{fontSize:11,color:C.green,fontWeight:700,marginBottom:6}},`🤖 ${s.sel} — Yahoo Finance + Claude`),
+          h("div",{style:{fontSize:12,color:"#c0c8d8",lineHeight:1.9,whiteSpace:"pre-wrap"}},s.ana)
+        ));
+      }
+    }
+  }
+
+  // ── VOLUME ──
+  if(s.tab==="vol"){
+    content.appendChild(h("div",{style:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}},
+      h("div",{},
+        h("div",{style:{fontWeight:900,fontSize:18,color:"#fff"}},"🔥 Volume Spikes"),
+        h("div",{style:{fontSize:10,color:C.muted}},"נתונים אמיתיים מ-Yahoo Finance")
+      ),
+      h("button",{className:"tap",style:{background:`${C.accent}20`,border:`1px solid ${C.accent}`,borderRadius:8,padding:"7px 14px",color:s.volL?"#888":C.accent,fontSize:11,fontWeight:700,cursor:"pointer"},
+        onclick:scanVolume},s.volL?"⏳ סורק...":"🔍 סרוק")
+    ));
+    if(s.volL) content.appendChild(h("div",{style:{textAlign:"center",padding:40,animation:"pulse 1.2s infinite",color:C.muted}},h("div",{style:{fontSize:32,marginBottom:8}},"📡"),h("div",{style:{fontSize:13,color:"#fff"}},"מושך נתוני נפח אמיתיים...")));
+    if(s.volRes.length>0&&!s.volL){
+      content.appendChild(h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginBottom:10}},
+        ...[{l:"🔴 >3x",v:s.volRes.filter(v=>v.ratio>=3).length,c:C.red},{l:"🟡 2-3x",v:s.volRes.filter(v=>v.ratio>=2&&v.ratio<3).length,c:C.yellow},{l:"📈 קנייה",v:s.volRes.filter(v=>v.type==="buy").length,c:C.green}].map(i=>
+          h("div",{style:{background:C.card,border:`1px solid ${i.c}30`,borderRadius:9,padding:"8px",textAlign:"center"}},h("div",{style:{fontSize:9,color:C.muted}},i.l),h("div",{style:{fontSize:22,fontWeight:900,color:i.c}},i.v))
+        )
+      ));
+      const filt=s.vfilt==="הכל"?s.volRes:s.volRes.filter(v=>s.vfilt==="buy"?v.type==="buy":s.vfilt==="sell"?v.type==="sell":v.urgency==="high");
+      content.appendChild(h("div",{style:{display:"flex",gap:5,marginBottom:10}},
+        ...["הכל","buy","sell","high"].map(f=>h("button",{className:"tap",style:{background:s.vfilt===f?`${C.accent}20`:"transparent",border:`1px solid ${s.vfilt===f?C.accent:C.border}`,borderRadius:20,padding:"4px 10px",fontSize:10,color:s.vfilt===f?C.accent:C.muted,fontWeight:700,cursor:"pointer"},onclick:()=>setState({vfilt:f})},f==="הכל"?"הכל":f==="buy"?"📈 קנייה":f==="sell"?"📉 מכירה":"🔴 קיצוני"))
+      ));
+      if(!s.vaiN){
+        content.appendChild(h("button",{className:"tap",style:{width:"100%",background:`${C.accent}15`,border:`1px solid ${C.accent}40`,borderRadius:9,padding:"8px 0",color:s.vaiL?"#888":C.accent,fontWeight:700,fontSize:12,marginBottom:10,cursor:"pointer"},
+          onclick:async()=>{if(s.vaiL)return;setState({vaiL:true});const top=s.volRes.slice(0,8).map(v=>`${v.symbol}(${v.ratio.toFixed(1)}x,${v.chgPct?.toFixed(1)}%)`).join(";");const n=await ai(`ניתח volume spikes אמיתיים בעברית, 3 משפטים: ${top}`,400);setState({vaiN:n,vaiL:false});}},s.vaiL?"🤖 מנתח...":"🤖 מה מסמנים הנפחים?"));
+      } else {
+        content.appendChild(h("div",{className:"card",style:{marginBottom:10}},h("div",{style:{fontSize:12,color:"#c0c8d8",lineHeight:1.8}},s.vaiN)));
+      }
+      for(const v of filt){
+        const uc=v.urgency==="high"?C.red:v.urgency==="medium"?C.orange:C.yellow, p=(v.chgPct||0)>=0;
+        content.appendChild(h("div",{className:"tap",style:{background:C.card,border:`1px solid ${uc}35`,borderRadius:11,padding:"10px 12px",marginBottom:7,display:"flex",alignItems:"center",justifyContent:"space-between"},onclick:()=>loadStockAndShow(v.symbol)},
+          h("div",{style:{display:"flex",alignItems:"center",gap:8}},
+            h("div",{style:{width:36,height:36,background:`${uc}20`,border:`1.5px solid ${uc}50`,borderRadius:9,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",flexShrink:0}},
+              h("span",{style:{fontSize:9,color:uc,fontWeight:900}},v.ratio.toFixed(1)+"x"),h("span",{style:{fontSize:7,color:uc}},"VOL")
+            ),
+            h("div",{},
+              h("div",{style:{display:"flex",gap:5,alignItems:"center"}},h("span",{style:{fontWeight:900,fontSize:14,color:"#fff"}},v.symbol),h("span",{style:{fontSize:9,color:p?C.green:C.red}},p?"📈":"📉")),
+              h("div",{style:{fontSize:9,color:C.muted}},v.name),
+              h("div",{style:{fontSize:9,color:C.accent}},`Yahoo: ${v.ratio.toFixed(1)}x ממוצע 20 יום`)
+            )
+          ),
+          h("div",{style:{textAlign:"left"}},
+            h("div",{style:{fontWeight:700,fontSize:13,color:"#fff"}},`$${(+v.price||0).toFixed(2)}`),
+            h("div",{style:{color:p?C.green:C.red,fontSize:11,fontWeight:700}},`${p?"▲":"▼"}${Math.abs(v.chgPct||0).toFixed(2)}%`)
+          )
+        ));
+      }
+    }
+    if(s.volRes.length===0&&!s.volL) content.appendChild(h("div",{style:{textAlign:"center",padding:50,color:C.muted}},h("div",{style:{fontSize:36,marginBottom:12}},"🔍"),h("div",{style:{fontSize:14,color:"#fff"}},"לחץ 'סרוק' לנתוני נפח אמיתיים")));
+  }
+
+  // ── SCANNER ──
+  if(s.tab==="scanner"){
+    content.appendChild(h("div",{style:{fontWeight:900,fontSize:18,color:"#fff",marginBottom:8}},"סורק 🔍"));
+    content.appendChild(h("div",{style:{display:"flex",gap:5,overflowX:"auto",marginBottom:10,paddingBottom:2}},
+      ...Object.keys(GROUPS).map(k=>h("button",{className:"tap",style:{whiteSpace:"nowrap",background:s.sgr===k?`${C.accent}20`:"transparent",border:`1px solid ${s.sgr===k?C.accent:C.border}`,borderRadius:20,padding:"4px 10px",fontSize:10,color:s.sgr===k?C.accent:C.muted,fontWeight:700,cursor:"pointer"},onclick:()=>setState({sgr:k,agr:null})},k))
+    ));
+    content.appendChild(h("button",{className:"tap",style:{width:"100%",background:s.agrL?`${C.accent}20`:`${C.accent}15`,border:`1px solid ${C.accent}40`,borderRadius:9,padding:"8px 0",color:s.agrL?"#888":C.accent,fontWeight:700,fontSize:12,marginBottom:s.agr?8:10,cursor:"pointer"},
+      onclick:async()=>{if(s.agrL)return;setState({agrL:true});const t=await ai(`ניתח סקטור בעברית 3 משפטים: ${GROUPS[s.sgr].join(",")}`,500);setState({agr:t,agrL:false});}},s.agrL?"🤖 מנתח...":"🤖 ניתוח AI לסקטור"));
+    if(s.agr) content.appendChild(h("div",{className:"card",style:{marginBottom:10}},h("div",{style:{fontSize:12,color:"#c0c8d8",lineHeight:1.8}},s.agr)));
+    content.appendChild(h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}},
+      ...(GROUPS[s.sgr]||[]).map(sym=>{
+        const cd=getC(`s_${sym}_6mo`),price=cd?.price,pct=cd?.chgPct||0;
+        return h("div",{className:"tap",style:{background:C.card,border:`1px solid ${cd?C.accent+"40":C.border}`,borderRadius:10,padding:"10px 12px",display:"flex",alignItems:"center",justifyContent:"space-between"},onclick:()=>loadStockAndShow(sym)},
+          h("div",{},
+            h("div",{style:{fontWeight:900,fontSize:14,color:"#fff"}},sym),
+            price?h("div",{style:{fontSize:10,color:pct>=0?C.green:C.red,fontWeight:700}},`$${(+price).toFixed(1)} ${pct>=0?"▲":"▼"}${Math.abs(pct).toFixed(1)}%`):h("div",{style:{fontSize:9,color:C.muted}},"לחץ לטעינה"),
+            cd?h("div",{style:{fontSize:8,color:C.accent}},"✓ Yahoo"):null
+          ),
+          h("div",{style:{color:C.accent,fontSize:18}},"›")
+        );
+      })
+    ));
+  }
+
+  // ── AI ──
+  if(s.tab==="ai"){
+    content.appendChild(h("div",{style:{fontWeight:900,fontSize:18,color:"#fff",marginBottom:8}},"יועץ AI 🤖"));
+    content.appendChild(h("div",{style:{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}},
+      ...["NVDA קורלציה","TSLA תמיכה","מי הכי חזק?","CRWD breakout?"].map(q=>h("span",{className:"tap",style:{background:C.card,border:`1px solid ${C.border}`,borderRadius:20,padding:"4px 10px",fontSize:10,color:C.muted,cursor:"pointer"},onclick:()=>setState({aiQ:q})},q))
+    ));
+    const ta=h("textarea",{style:{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:11,padding:"11px 12px",color:"#e0e0f0",fontSize:13,resize:"none",direction:"rtl",lineHeight:1.6,marginBottom:8},placeholder:"שאל כל שאלה על מסחר...",rows:4});
+    ta.value=s.aiQ; ta.addEventListener("input",e=>state.aiQ=e.target.value);
+    content.appendChild(ta);
+    content.appendChild(h("button",{className:"tap btn",style:{width:"100%",background:s.aiL||!s.aiQ.trim()?`${C.accent}30`:"linear-gradient(135deg,#7c6aff,#00f5c4)",color:s.aiL||!s.aiQ.trim()?"#888":"#000",marginBottom:10},
+      onclick:async()=>{if(s.aiL||!s.aiQ.trim())return;setState({aiL:true,aiAns:null});const a=await ai(`ענה בעברית קצר ומעשי: ${s.aiQ}`,700);setState({aiAns:a,aiL:false});}},s.aiL?"🤖 חושב...":"שאל ⚡"));
+    if(s.aiAns) content.appendChild(h("div",{className:"card"},h("div",{style:{fontSize:13,color:"#c0c8d8",lineHeight:1.9,whiteSpace:"pre-wrap"}},s.aiAns)));
+  }
+
+  content.appendChild(h("div",{style:{height:30}}));
+  app.appendChild(content);
+}
+
+// ── Actions ────────────────────────────────────────────────────
+async function loadStockAndShow(sym, range) {
+  const r = range || TRS[state.trIdx].r;
+  setState({sel:sym,tab:"stocks",loading:true,sd:null,anomalies:[],err:null,ana:null});
+  try {
+    const d = await loadStock(sym, r);
+    setState({sd:d, anomalies:detectAnomalies(d.candles), loading:false});
+  } catch(e) {
+    setState({err:`${e.message}\n${PROXY}/api/stock?sym=${sym}`, loading:false});
+  }
+}
+
+async function scanVolume() {
+  if(state.volL) return;
+  setState({volL:true, volRes:[], vaiN:null});
+  const syms=[...new Set(Object.values(GROUPS).flat())];
+  const results=[];
+  for(const sym of syms){
+    try{
+      const d=await loadStock(sym,"1mo");
+      if(!d?.candles?.length) continue;
+      const c=d.candles, n=c.length;
+      if(n<22) continue;
+      const avg20=c.slice(n-21,n-1).reduce((a,x)=>a+(x.v||0),0)/20;
+      const todayVol=c[n-1].v||0;
+      if(!avg20) continue;
+      const ratio=todayVol/avg20;
+      if(ratio>=1.5) results.push({symbol:sym,name:META[sym]?.n||sym,price:d.price,chgPct:d.chgPct,
+        todayVol,avgVol:avg20,ratio:+ratio.toFixed(2),type:d.chgPct>=0?"buy":"sell",
+        urgency:ratio>=3?"high":ratio>=2?"medium":"low",sector:META[sym]?.s||""});
+    }catch{}
+  }
+  results.sort((a,b)=>b.ratio-a.ratio);
+  setState({volRes:results, volL:false});
+}
+
+// ── Init ────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
