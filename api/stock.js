@@ -1,102 +1,74 @@
-// api/stock.js — Yahoo Finance ללא API key
-// עובד ישירות מ-Vercel serverless
+// api/stock.js — Alpha Vantage
+const AV_KEY  = "95X0D7ZZABCS7ZJ9";
+const AV_BASE = "https://www.alphavantage.co/query";
+
+const RANGE_DAYS = {
+  "1d":5, "5d":10, "1mo":30, "3mo":90, "6mo":180, "1y":365, "2y":730
+};
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS");
-  res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
+  res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=7200");
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { sym, range = "6mo" } = req.query;
   if (!sym) return res.status(400).json({ error: "sym required" });
 
   const symbol = sym.toUpperCase();
-  const interval = range === "1d" ? "5m" : range === "5d" ? "15m" : "1d";
+  const days = RANGE_DAYS[range] || 180;
 
-  // נסה כמה endpoints של Yahoo
-  const urls = [
-    `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${range}&interval=${interval}&includePrePost=false`,
-    `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?range=${range}&interval=${interval}&includePrePost=false`,
-  ];
+  try {
+    // היסטוריה יומית מלאה
+    const url = `${AV_BASE}?function=TIME_SERIES_DAILY_ADJUSTED&symbol=${symbol}&outputsize=full&apikey=${AV_KEY}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
 
-  const headers = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Origin": "https://finance.yahoo.com",
-    "Referer": "https://finance.yahoo.com/",
-    "Sec-Fetch-Dest": "empty",
-    "Sec-Fetch-Mode": "cors",
-    "Sec-Fetch-Site": "same-site",
-  };
+    if (data["Note"]) throw new Error("API limit — נסה שוב בעוד דקה");
+    if (data["Error Message"]) throw new Error(`סמל לא נמצא: ${symbol}`);
+    if (data["Information"]) throw new Error("API limit — נסה שוב מחר");
 
-  let lastError = "";
+    const ts = data["Time Series (Daily)"];
+    if (!ts) throw new Error("אין נתונים");
 
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { headers });
+    const entries = Object.entries(ts)
+      .sort((a, b) => new Date(b[0]) - new Date(a[0]));
 
-      if (!r.ok) {
-        lastError = `HTTP ${r.status} from ${url}`;
-        continue;
-      }
+    const candles = entries
+      .slice(0, days)
+      .reverse()
+      .map(([date, v]) => ({
+        t: Math.floor(new Date(date).getTime() / 1000),
+        o: +parseFloat(v["1. open"]).toFixed(2),
+        h: +parseFloat(v["2. high"]).toFixed(2),
+        l: +parseFloat(v["3. low"]).toFixed(2),
+        c: +parseFloat(v["5. adjusted close"]).toFixed(2),
+        v: parseInt(v["6. volume"]),
+      }));
 
-      const data = await r.json();
-      const result = data?.chart?.result?.[0];
-      if (!result) {
-        lastError = "No result in response";
-        continue;
-      }
+    if (!candles.length) throw new Error("אין נתונים לטווח זה");
 
-      const { timestamp, indicators, meta } = result;
-      const q = indicators.quote[0];
+    const last    = candles[candles.length - 1];
+    const prev    = candles[candles.length - 2];
+    const price   = last.c;
+    const prevClose = prev?.c || last.o;
+    const chgPct  = +((price - prevClose) / prevClose * 100).toFixed(2);
 
-      const candles = timestamp
-        .map((t, i) => ({
-          t,
-          o: q.open[i]   != null ? +q.open[i].toFixed(2)   : null,
-          h: q.high[i]   != null ? +q.high[i].toFixed(2)   : null,
-          l: q.low[i]    != null ? +q.low[i].toFixed(2)    : null,
-          c: q.close[i]  != null ? +q.close[i].toFixed(2)  : null,
-          v: q.volume[i] ?? 0,
-        }))
-        .filter(c => c.c !== null);
+    const year      = entries.slice(0, 252);
+    const week52High = +Math.max(...year.map(([,v]) => parseFloat(v["2. high"]))).toFixed(2);
+    const week52Low  = +Math.min(...year.map(([,v]) => parseFloat(v["3. low"]))).toFixed(2);
 
-      if (!candles.length) {
-        lastError = "No candles after filtering";
-        continue;
-      }
+    return res.status(200).json({
+      symbol, price, prevClose, chgPct,
+      high: last.h, low: last.l, volume: last.v,
+      week52High, week52Low,
+      lastDate: entries[0][0],
+      candles,
+      source: "alphavantage",
+    });
 
-      const price     = meta.regularMarketPrice;
-      const prevClose = meta.chartPreviousClose;
-      const chgPct    = +((price - prevClose) / prevClose * 100).toFixed(2);
-
-      return res.status(200).json({
-        symbol,
-        price:       +price.toFixed(2),
-        prevClose:   +prevClose.toFixed(2),
-        chgPct,
-        high:        meta.regularMarketDayHigh,
-        low:         meta.regularMarketDayLow,
-        volume:      meta.regularMarketVolume,
-        mktCap:      meta.marketCap,
-        week52High:  meta.fiftyTwoWeekHigh,
-        week52Low:   meta.fiftyTwoWeekLow,
-        currency:    meta.currency,
-        exchange:    meta.exchangeName,
-        candles,
-        source:      "yahoo",
-      });
-
-    } catch (e) {
-      lastError = e.message;
-    }
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
-
-  // אם Yahoo נכשל — החזר שגיאה ברורה
-  return res.status(502).json({
-    error: `Yahoo Finance חסום מ-Vercel: ${lastError}`,
-    suggestion: "נסה להוסיף AV_KEY מ-alphavantage.co (חינמי)"
-  });
 }
